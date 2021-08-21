@@ -14,6 +14,7 @@ import os
 import sys
 import tarfile
 import subprocess
+import socket
 from OpenSSL import crypto
 
 # Change this if you want to use DH parameters of a different size
@@ -37,7 +38,7 @@ def certerator_config():
     server_ca['cert_key'] = "server_ca.key"
     server_ca['serial'] = 12345999
     server_ca['validfrom'] = "20160101000000Z"
-    server_ca['validto'] = "20170101000000Z"
+    server_ca['validto'] = "20300101000000Z"
     server_ca['keyfilesize'] = 4096
     server_ca['hashalgorithm'] = "sha512"
 
@@ -53,7 +54,7 @@ def certerator_config():
     server_cert['cert_key'] = "server_cert.key"
     server_cert['serial'] = 12345888
     server_cert['validfrom'] = "20160101000000Z"
-    server_cert['validto'] = "20170101000000Z"
+    server_cert['validto'] = "20300101000000Z"
     server_cert['keyfilesize'] = 4096
     server_cert['hashalgorithm'] = "sha512"
 
@@ -69,7 +70,7 @@ def certerator_config():
     client_ca['cert_key'] = "client_ca.key"
     client_ca['serial'] = 12345777
     client_ca['validfrom'] = "20160101000000Z"
-    client_ca['validto'] = "20170101000000Z"
+    client_ca['validto'] = "20300101000000Z"
     client_ca['keyfilesize'] = 4096
     client_ca['hashalgorithm'] = "sha512"
 
@@ -85,7 +86,7 @@ def certerator_config():
     client_cert['cert_key'] = "client_cert.key"
     client_cert['serial'] = 12345666
     client_cert['validfrom'] = "20160101000000Z"
-    client_cert['validto'] = "20170101000000Z"
+    client_cert['validto'] = "20300101000000Z"
     client_cert['keyfilesize'] = 4096
     client_cert['hashalgorithm'] = "sha512"
 
@@ -279,6 +280,17 @@ def build_openssl_extra():
     sys.stdout.write("\n")
     sys.stdout.flush()
 
+def get_ip():
+    st = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:       
+        st.connect(('10.255.255.255', 1))
+        IP = st.getsockname()[0]
+    except Exception:
+        IP = '127.0.0.1'
+    finally:
+        st.close()
+    return IP
+
 if __name__ == "__main__":
     banner()
     try:
@@ -314,7 +326,7 @@ if __name__ == "__main__":
         sys.stdout.write("\n")
 
         # Build the server config file
-        server_config = open('example.server.conf', 'w')
+        server_config = open('server.conf', 'w')
         server_config.write("port 1194\n")
         server_config.write("proto udp\n")
         server_config.write("dev tun\n")
@@ -325,9 +337,9 @@ if __name__ == "__main__":
         server_config.write("server 10.255.255.0 255.255.255.0\n")
         server_config.write("topology net30\n")
         server_config.write("ifconfig-pool-persist ipp.txt\n")
-        server_config.write("push \"redirect-gateway def1 bypass-dhcp\"\n")
-        server_config.write("push \"dhcp-option DNS 8.8.8.8\"\n")
-        server_config.write("push \"dhcp-option DNS 8.8.4.4\"\n")
+        server_config.write("#push \"redirect-gateway def1 bypass-dhcp\"\n")
+        server_config.write("#push \"dhcp-option DNS 8.8.8.8\"\n")
+        server_config.write("#push \"dhcp-option DNS 8.8.4.4\"\n")
         server_config.write("keepalive 10 120\n")
         server_config.write("tls-auth ta.key 0\n")
         server_config.write("cipher AES-128-CBC\n")
@@ -340,11 +352,11 @@ if __name__ == "__main__":
         server_config.close()
 
         # Build the client config file
-        client_config = open('example.client.conf', 'w')
+        client_config = open('client.conf', 'w')
         client_config.write("client\n")
         client_config.write("dev tun\n")
         client_config.write("proto udp\n")
-        client_config.write("remote SERVER 1194\n")
+        client_config.write("remote "+get_ip()+" 1194\n")
         client_config.write("resolv-retry infinite\n")
         client_config.write("nobind\n")
         client_config.write("#user openvpn\n")
@@ -369,15 +381,15 @@ if __name__ == "__main__":
         client_config.close()
 
         # Inform the user
-        sys.stdout.write(colourise("Example configs written to example.server.conf and example.client.conf\n", '0;32'))
+        sys.stdout.write(colourise("Example configs written to server.conf and client.conf\n", '0;32'))
    
         # Tar up the required files for the server and client
-        build_tar('example.server.tar.gz', ['client_ca.pem','ta.key','dh'+str(DH_PARAM_SIZE)+'.pem','server_cert.pem','server_cert.key','example.server.conf'])
-        build_tar('example.client.tar.gz', ['server_ca.pem','ta.key','client_cert.pem','client_cert.key','example.client.conf'])
+        build_tar('server.tar.gz', ['client_ca.pem','ta.key','dh'+str(DH_PARAM_SIZE)+'.pem','server_cert.pem','server_cert.key','server.conf'])
+        build_tar('client.tar.gz', ['server_ca.pem','ta.key','client_cert.pem','client_cert.key','client.conf','install-client.sh'])
 
         # Inform the user
-        sys.stdout.write(colourise("\nServer configuration and related files are in example.server.tar.gz\n", '0;32'))
-        sys.stdout.write(colourise("Client configuration and related files are in example.client.tar.gz\n", '0;32'))
+        sys.stdout.write(colourise("\nServer configuration and related files are in server.tar.gz\n", '0;32'))
+        sys.stdout.write(colourise("Client configuration and related files are in client.tar.gz\n", '0;32'))
         sys.stdout.write("\033[0;37m")
         sys.stdout.flush()
         sys.exit(0)
